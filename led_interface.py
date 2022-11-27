@@ -35,7 +35,7 @@ class LEDDriver():
             return
         
         self.isConnecting = True
-        self.mqtt_client.publish(config.MQTT_TOPIC, "led-on-" + self.name)
+        self.mqtt_client.publish(config.MQTT_TOPIC, '{ "place": "' + self.name + '" }')
 #         addr = socket.getaddrinfo(self.url, 80)[0][-1]
 #         s = socket.socket()
 # #        s.settimeout(0.5)
@@ -48,3 +48,4 @@ class LEDDriver():
         self.serverCalled = True
         return
        
+
