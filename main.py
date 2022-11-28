@@ -19,7 +19,6 @@ tv = Pin(6, Pin.IN)
 trees = Pin(28, Pin.IN)
 loop_break = Pin(12, Pin.IN, Pin.PULL_UP)
 
-wifi = None
 mqtt_client = None
 
 def log(text, time = 0):
@@ -71,7 +70,7 @@ log("Initializing ...")
 count_down(3)
 
 try:
-    wifi = connect_wifi()
+    connect_wifi()
 except Exception as e:
     log("ERR WiFi")
     count_down(1)

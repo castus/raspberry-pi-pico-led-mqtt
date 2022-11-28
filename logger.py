@@ -1,7 +1,6 @@
-from machine import SoftI2C
+from machine import Pin, SoftI2C
+
 from i2c_lcd import I2cLcd
-from machine import Pin
-from time import sleep
 
 class AbstractLogger:
     def clear(self):
@@ -25,24 +24,25 @@ class AbstractLogger:
         # Write the indicated string to the LCD at the current cursor
         # position and advances the cursor position appropriately.
         pass
-    
+
+
 class LCDLogger(AbstractLogger):
     def __init__(self):
         i2c = SoftI2C(sda=Pin(8), scl=Pin(9), freq=400000)
-        sleep(5)
         devices = i2c.scan()
- 
+
         if len(devices) == 0:
           print("No i2c device !")
         else:
-          print('i2c devices found:',len(devices))
-         
-          for device in devices:  
-            print("Decimal address: ",device," | Hexa address: ",hex(device))
+          print('i2c devices found:', len(devices))
+
+          for device in devices:
+            print("Decimal address: ", device,
+                  " | Hexa address: ", hex(device))
 
         I2C_ADDR = i2c.scan()[0]
         self.lcd = I2cLcd(i2c, I2C_ADDR, 2, 16)
-        
+
     def clear(self):
         self.lcd.clear()
 
@@ -57,7 +57,9 @@ class LCDLogger(AbstractLogger):
 
     def putstr(self, string):
         self.lcd.putstr(string)
-        
+        print(string)
+
+
 class TerminalLogger(AbstractLogger):
     def clear(self):
         pass
@@ -70,7 +72,6 @@ class TerminalLogger(AbstractLogger):
 
     def move_to(self, cursor_x, cursor_y):
         pass
-    
+
     def putstr(self, string):
         print(string)
-        
