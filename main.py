@@ -1,18 +1,18 @@
-import network
-from machine import Pin
-import socket
+import _thread
 import time
 from time import sleep
+
+import machine
+import netman
+from machine import Pin
+
+import config
 from led_interface import LEDDriver
 from logger import LCDLogger, TerminalLogger
-import _thread
-import config
-
 from umqttsimple import MQTTClient
-import ubinascii
 
-logger = TerminalLogger()
-# logger = LCDLogger()
+#logger = TerminalLogger()
+logger = LCDLogger()
 
 led = Pin("LED", Pin.OUT)
 tv = Pin(6, Pin.IN)
@@ -26,9 +26,9 @@ def log(text, time = 0):
     logger.clear()
     logger.putstr(text)
 
-def count_down(times, x = 0, y = 1):
+def count_down(times, x = 15, y = 1):
     for n in range(times):
-        logger.move_to(x,y)
+        logger.move_to(x, y)
         logger.putstr(str(times - n - 1))
         sleep(1)
 
@@ -44,38 +44,15 @@ def blink(times, timeout = 0.25):
         sleep(timeout)
         led.off()
 
-def mqtt_callback(topic, msg):
-    print((topic, msg))
-    if topic == b'notification' and msg == b'received':
-        print('ESP received hello message')
-
 def connect_wifi():
-    nic = network.WLAN(network.STA_IF)
-    nic.active(True)
-    nic.connect(config.WIFI_SSID, config.WIFI_PASSWORD)
-    count_down(5)
-    
-    tries = 0
-    while not nic.isconnected():
-        if tries < 10000:
-            machine.reset()
-        log('Still connecting - ' + str(tries))
-        tries += 1
-        machine.idle()
-        
+    log("Connecting WiFi ... ")
+    wifi_connection = netman.connectWiFi(config.WIFI_SSID,config.WIFI_PASSWORD,"PL")
     log('Connected to WiFi!')
-    return nic
+    return wifi_connection
     
 def connect_mqtt():
-    mqtt_server = config.MQTT_SERVER
-    #client_id = ubinascii.hexlify(machine.unique_id())
-    client_id = "raspberryPicoLeds"
-    topic_sub = b'leds'
-    client = MQTTClient(client_id, mqtt_server)
-    client.set_callback(mqtt_callback)
+    client = MQTTClient('PicoW', config.MQTT_SERVER, port=config.MQTT_PORT, user='admin', password='admin', keepalive=60)
     client.connect()
-    count_down(2)
-    client.subscribe(topic_sub)
     return client
 
 def program_is_running_indicator():
@@ -94,41 +71,44 @@ log("Initializing ...")
 count_down(3)
 
 try:
-    log("Connecting WiFi ... ")
     wifi = connect_wifi()
-    log('WiFi connected!')
-except OSError as e:
+except Exception as e:
     log("ERR WiFi")
     count_down(1)
     log(str(e))
     count_down(5)
     restart()
 
-try:
-    log('Connecting MQTT ...')
-    mqtt_client = connect_mqtt()
-    log('MQTT connected!')
-except OSError as e:
-    log("ERR MQTT")
-    count_down(1)
-    log(str(e))
-    count_down(5)
-    restart()
-
-log("Program is running ...")
+_thread.start_new_thread(program_is_running_indicator, ())
+log("Executing main loop ...")
 led.off()
 
-led_tv = LEDDriver("tv", mqtt_client)
-led_trees = LEDDriver("trees", mqtt_client)
-
-_thread.start_new_thread(program_is_running_indicator, ())
-
+ping_interval = 20000 # in ms
 while True:
-    led_tv.feed(bool(tv.value()))
-    led_trees.feed(bool(trees.value()))
     if loop_break.value() == 0:
-        logger.clear()
-        break
-    mqtt_client.ping()
-    sleep(0.25)
+        raise RuntimeError('Break the loop')
 
+    try:
+        client = connect_mqtt()
+        led_tv = LEDDriver("tv", client)
+        led_trees = LEDDriver("trees", client)
+    except OSError as e:
+        restart()
+    
+    last_tick = time.ticks_ms()
+    while True:
+        if loop_break.value() == 0:
+            raise RuntimeError('Break the loop')
+
+        try:
+            led_tv.feed(bool(tv.value()))
+            led_trees.feed(bool(trees.value()))
+            current_tick = time.ticks_ms()
+            if(time.ticks_diff(current_tick, last_tick) >= ping_interval):
+                last_tick = current_tick
+                client.publish('leds', msg='pico ping')
+        except:
+            restart()
+            pass
+        
+    client.disconnect()
