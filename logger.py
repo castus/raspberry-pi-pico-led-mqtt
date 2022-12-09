@@ -31,16 +31,16 @@ class LCDLogger(AbstractLogger):
         i2c = SoftI2C(sda=Pin(8), scl=Pin(9), freq=400000)
         devices = i2c.scan()
 
-        if len(devices) == 0:
-          print("No i2c device !")
-        else:
-          print('i2c devices found:', len(devices))
+#         if len(devices) == 0:
+#           print("No i2c device !")
+#         else:
+#           print('i2c devices found:', len(devices))
+# 
+#           for device in devices:
+#             print("Decimal address: ", device,
+#                   " | Hexa address: ", hex(device))
 
-          for device in devices:
-            print("Decimal address: ", device,
-                  " | Hexa address: ", hex(device))
-
-        I2C_ADDR = i2c.scan()[0]
+        I2C_ADDR = devices[0]
         self.lcd = I2cLcd(i2c, I2C_ADDR, 2, 16)
 
     def clear(self):
@@ -75,3 +75,4 @@ class TerminalLogger(AbstractLogger):
 
     def putstr(self, string):
         print(string)
+
